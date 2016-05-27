@@ -177,10 +177,14 @@
 #define sb_count  stb_sb_count
 #define sb_add    stb_sb_add
 #define sb_last   stb_sb_last
+#define sb_pop    stb_sb_pop
+#define sb_dq     stb_sb_dq
 #endif
 
 #define stb_sb_free(a)         ((a) ? free(stb__sbraw(a)),0 : 0)
 #define stb_sb_push(a,v)       (stb__sbmaybegrow(a,1), (a)[stb__sbn(a)++] = (v))
+#define stb_sb_pop(a,n)        ( ((a) && (stb__sbn(a) >= n)) ? (a) = stb__sbshrinkf(a, n, sizeof(*(a)), 1) : 0 )
+#define stb_sb_dq(a,n)         ( ((a) && (stb__sbn(a) >= n)) ? (a) = stb__sbshrinkf(a, n, sizeof(*(a)), 0) : 0 )
 #define stb_sb_count(a)        ((a) ? stb__sbn(a) : 0)
 #define stb_sb_add(a,n)        (stb__sbmaybegrow(a,n), stb__sbn(a)+=(n), &(a)[stb__sbn(a)-(n)])
 #define stb_sb_last(a)         ((a)[stb__sbn(a)-1])
@@ -194,6 +198,7 @@
 #define stb__sbgrow(a,n)      ((a) = stb__sbgrowf((a), (n), sizeof(*(a))))
 
 #include <stdlib.h>
+#include <string.h>
 
 static void * stb__sbgrowf(void *arr, int increment, int itemsize)
 {
@@ -212,5 +217,26 @@ static void * stb__sbgrowf(void *arr, int increment, int itemsize)
       #endif
       return (void *) (2*sizeof(int)); // try to force a NULL pointer exception later
    }
+}
+
+static void * stb__sbshrinkf(void *arr, int decrement, int itemsize, int side)
+{
+    int m = stb_sb_count(arr) - decrement;
+    int *p = (int *) malloc(itemsize*m + sizeof(int)*2);
+    if(p) {
+        p[0] = m;
+        p[1] = m;
+        if(side > 0)
+            memcpy(p+2, arr, itemsize*m);
+        else
+            memcpy(p+2, ((char*)arr)+itemsize, itemsize*m);
+        free(((int*)arr)-2);
+        return p+2;
+    } else {
+       #ifdef STRETCHY_BUFFER_OUT_OF_MEMORY
+       STRETCHY_BUFFER_OUT_OF_MEMORY ;
+       #endif
+       return arr;
+    }
 }
 #endif // STB_STRETCHY_BUFFER_H_INCLUDED
